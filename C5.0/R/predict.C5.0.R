@@ -2,7 +2,7 @@ library(Cubist)
 library("data.table")
 #library(C50)
 
-##### Función makeDataFile de Cubist
+##### Load shared object top.so
 dyn.load("C5.0/src/top.so")
 
 
@@ -73,13 +73,15 @@ create_strings <- function(original_vector) {
   strings_vector
 }
 
+## escapes function from Cubist package
 escapes <- function(x, chars = c(":", ";", "|")) {
   for (i in chars)
     x <- gsub(i, paste("\\", i, sep = ""), x, fixed = TRUE)
   gsub("([^[:alnum:]^[:space:]])", "\\\\\\1", x, useBytes = TRUE)
 }
 
-makeDataFile_modificado <- function(x, y, w = NULL) {
+## makeDataFile function from Cubist package modified
+makeDataFile <- function(x, y, w = NULL) {
   if (!is.data.frame(x) || inherits(x, "tbl_df")) {
     x <- as.data.frame(x)
   }
@@ -245,9 +247,9 @@ predict.C5.0 <-
       newdata$case_weight_pred <- NA
 
     ## make cases file
-    caseString_mio <- makeDataFile_modificado(x = newdata, y = NULL)
+    caseString <- makeDataFile(x = newdata, y = NULL)
   
-    num_chars = sum(nchar(caseString_mio, type = "chars"))
+    num_chars = sum(nchar(caseString, type = "chars"))
     
 
     ## When passing trials to the C code, convert to
@@ -258,11 +260,10 @@ predict.C5.0 <-
     if (trials == object$trials["Actual"])
       trials <- 0
       
-
     ## Add trials (not object$trials) as an argument
     results <- .Call(
       "call_predictions",
-      caseString_mio,
+      caseString,
       as.character(num_chars),
       as.character(object$names),
       as.character(object$tree),
@@ -276,8 +277,7 @@ predict.C5.0 <-
     
     predictions = as.numeric(unlist(results[1]))
     confidence = as.numeric(unlist(results[2]))
-    output = as.character(results[3])
-    
+    output = as.character(results[3])    
     
     if(any(grepl("Error limit exceeded", output)))
       stop(output, call. = FALSE)
@@ -295,7 +295,7 @@ predict.C5.0 <-
     }
     
     rm(results)
-    rm(caseString_mio)
+    rm(caseString)
     rm(newdata)
     rm(object)
     gc()
