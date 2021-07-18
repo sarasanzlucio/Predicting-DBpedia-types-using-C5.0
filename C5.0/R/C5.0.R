@@ -315,124 +315,120 @@ C5.0.default <- function(x,
                   label = control$label,
                   comments = TRUE)
                   
-  #### ERROR ####                
-  dataString_mio <- makeDataFile_modificado(x, y, weights)
-  
-  num_chars = sum(nchar(dataString_mio, type = "chars"))
-  
-  resultado <- .Call(
-    "call_C50",
-    as.character(namesString),
-    dataString_mio,
-    as.character(num_chars),
-    as.character(costString),
-    as.logical(control$subset),
-    # -s "use the Subset option" var name: SUBSET
-    as.logical(rules),
-    # -r "use the Ruleset option" var name: RULES
+  dataString <- makeDataFile(x, y, weights)
+  num_chars = sum(nchar(dataString, type = "chars"))
 
-    ## for the bands option, I'm not sure what the default should be.
-    as.integer(control$bands),
-    # -u "sort rules by their utility into bands" var name: UTILITY
+  result <- .Call(
+      "call_C50",
+      as.character(namesString),
+      dataString,
+      as.character(num_chars), ## The length of the resulting string is passed as character because it is too long for an integer
+      as.character(costString),
+      as.logical(control$subset),
+      # -s "use the Subset option" var name: SUBSET
+      as.logical(rules),
+      # -r "use the Ruleset option" var name: RULES
 
-    ## The documentation has two options for boosting:
-    ## -b use the Boosting option with 10 trials
-    ## -t trials ditto with specified number of trial
-    ## I think we should use -t
-    as.integer(trials),
-    # -t : " ditto with specified number of trial", var name: TRIALS
+      ## for the bands option, I'm not sure what the default should be.
+      as.integer(control$bands),
+      # -u "sort rules by their utility into bands" var name: UTILITY
 
-    as.logical(control$winnow),
-    # -w "winnow attributes before constructing a classifier" var name: WINNOW
-    as.double(control$sample),
-    # -S : use a sample of x% for training
-    #      and a disjoint sample for testing var name: SAMPLE
-    as.integer(control$seed),
-    # -I : set the sampling seed value
-    as.integer(control$noGlobalPruning),
-    # -g: "turn off the global tree pruning stage" var name: GLOBAL
-    as.double(control$CF),
-    # -c: "set the Pruning CF value" var name: CF
+      ## The documentation has two options for boosting:
+      ## -b use the Boosting option with 10 trials
+      ## -t trials ditto with specified number of trial
+      ## I think we should use -t
+      as.integer(trials),
+      # -t : " ditto with specified number of trial", var name: TRIALS
 
-    ## Also, for the number of minimum cases, I'm not sure what the
-    ## default should be. The code looks like it dynamically sets the
-    ## value (as opposed to a static, universal integer
-    as.integer(control$minCases),
-    # -m : "set the Minimum cases" var name: MINITEMS
+      as.logical(control$winnow),
+      # -w "winnow attributes before constructing a classifier" var name: WINNOW
+      as.double(control$sample),
+      # -S : use a sample of x% for training
+      #      and a disjoint sample for testing var name: SAMPLE
+      as.integer(control$seed),
+      # -I : set the sampling seed value
+      as.integer(control$noGlobalPruning),
+      # -g: "turn off the global tree pruning stage" var name: GLOBAL
+      as.double(control$CF),
+      # -c: "set the Pruning CF value" var name: CF
 
-    as.logical(control$fuzzyThreshold),
-    # -p "use the Fuzzy thresholds option" var name: PROBTHRESH
-    as.logical(control$earlyStopping)
-  )
-  
-  
-  tree_mio = resultado[1]
-  rules_mio = resultado[2]
-  output_mio = resultado[3]
+      ## Also, for the number of minimum cases, I'm not sure what the
+      ## default should be. The code looks like it dynamically sets the
+      ## value (as opposed to a static, universal integer
+      as.integer(control$minCases),
+      # -m : "set the Minimum cases" var name: MINITEMS
 
-  ## Figure out how may trials were actually used.
+      as.logical(control$fuzzyThreshold),
+      # -p "use the Fuzzy thresholds option" var name: PROBTHRESH
+      as.logical(control$earlyStopping)
+    )
+
+  ## Get the first three positions of the character vector that contain the tree, rules and output returned by C5.0 in C
+
+  result_tree = result[1]
+  result_rules = result[2]
+  result_output = result[3]
+
   modelContent <- strsplit(
-    if (rules)
-      rules_mio
-    else
-      tree_mio, "\n"
-  )[[1]]
-  entries <- grep("^entries", modelContent, value = TRUE)
-  if (length(entries) > 0) {
-    actual <- as.numeric(substring(entries, 10, nchar(entries) - 1))
-  } else
-    actual <- trials
+      if (rules)
+        result_rules
+      else
+        result_tree, "\n"
+    )[[1]]
+    entries <- grep("^entries", modelContent, value = TRUE)
+    if (length(entries) > 0) {
+      actual <- as.numeric(substring(entries, 10, nchar(entries) - 1))
+    } else
+      actual <- trials
 
+    if (trials > 1) {
+      boostResults <- getBoostResults(result_output)
+      ## This next line is here to avoid a false positive warning in R
+      ## CMD check:
+      ## * checking R code for possible problems ... NOTE
+      ## C5.0.default: no visible binding for global variable 'Data'
+      Data <- NULL
+      size <-
+        if (!is.null(boostResults))
+          subset(boostResults, Data == "Training Set")$Size
+      else
+        NA
+    }   else {
+      boostResults <- NULL
+      size <- length(grep("[0-9])$", strsplit(result_output, "\n")[[1]]))
+    }
 
-  if (trials > 1) {
-    boostResults <- getBoostResults(output_mio)
-    ## This next line is here to avoid a false positive warning in R
-    ## CMD check:
-    ## * checking R code for possible problems ... NOTE
-    ## C5.0.default: no visible binding for global variable 'Data'
-    Data <- NULL
-    size <-
-      if (!is.null(boostResults))
-        subset(boostResults, Data == "Training Set")$Size
-    else
-      NA
-  }   else {
-    boostResults <- NULL
-    size <- length(grep("[0-9])$", strsplit(output_mio, "\n")[[1]]))
-  }
+    out <- list(
+      names = namesString,
+      cost = costString,
+      costMatrix = costs,
+      caseWeights = !is.null(weights),
+      control = control,
+      trials = c(Requested = trials, Actual = actual),
+      rbm = rules,
+      boostResults = boostResults,
+      size = size,
+      dims = dim(x),
+      call = funcCall,
+      levels = levels(y),
+      output = result_output,
+      tree = result_tree,
+      predictors = colnames(x),
+      rules = result_rules
+    )
   
+    gc()
+    rm(result)
+    rm(result_tree)
+    rm(result_rules)
+    rm(result_output)
+    rm(namesString)
+    rm(costString)
+    rm(dataString)
 
-  out <- list(
-    names = namesString,
-    cost = costString,
-    costMatrix = costs,
-    caseWeights = !is.null(weights),
-    control = control,
-    trials = c(Requested = trials, Actual = actual),
-    rbm = rules,
-    boostResults = boostResults,
-    size = size,
-    dims = dim(x),
-    call = funcCall,
-    levels = levels(y),
-    output = output_mio,
-    tree = tree_mio,
-    predictors = colnames(x),
-    rules = rules_mio
-  )
-  
-  gc()
-  rm(resultado)
-  rm(tree_mio)
-  rm(rules_mio)
-  rm(output_mio)
-  rm(namesString)
-  rm(costString)
-  rm(dataString_mio)
-  
 
-  class(out) <- "C5.0"
-  out
+    class(out) <- "C5.0"
+    out
 }
 
 #' @export
