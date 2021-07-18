@@ -1,10 +1,10 @@
 library(Cubist)
 library("data.table")
 
-##### Función makeDataFile de Cubist
+##### Load shared object top.so
 dyn.load("C5.0/src/top.so")
 
-
+## escapes function from Cubist package
 escapes <- function(x, chars = c(":", ";", "|")) {
   for (i in chars)
     x <- gsub(i, paste("\\", i, sep = ""), x, fixed = TRUE)
@@ -80,7 +80,9 @@ create_strings <- function(original_vector) {
   strings_vector
 }
 
-makeDataFile_modificado <- function(x, y, w = NULL) {
+
+## makeDataFile function from Cubist package modified
+makeDataFile <- function(x, y, w = NULL) {
   if (!is.data.frame(x) || inherits(x, "tbl_df")) {
     x <- as.data.frame(x)
   }
