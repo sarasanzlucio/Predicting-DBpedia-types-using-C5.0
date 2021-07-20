@@ -55,6 +55,7 @@ STRBUF *strbuf_create_empty(unsigned int len) {
  */
 STRBUF *strbuf_create_full(unsigned char *data, unsigned int len) {
   STRBUF *sb;
+  
 
   /* Allocate memory for the STRBUF */
   sb = (STRBUF *)malloc(sizeof(STRBUF));
@@ -68,6 +69,7 @@ STRBUF *strbuf_create_full(unsigned char *data, unsigned int len) {
   sb->len = len;
   sb->open = FALSE;
   sb->own = FALSE;
+
 
   /* Return a pointer to the STRBUF */
   return sb;
@@ -99,7 +101,7 @@ STRBUF *strbuf_copy(STRBUF *sb) {
   nsb->len = sb->len;
   nsb->open = FALSE;
   nsb->own = TRUE;
- 
+
   /* Return a pointer to the STRBUF */
   return nsb;
 }
